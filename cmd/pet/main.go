@@ -22,7 +22,7 @@ func main() {
 		Short: "Terminal pet companion — level up by committing code",
 	}
 
-	root.AddCommand(hatchCmd())
+	root.AddCommand(spawnCmd())
 	root.AddCommand(showCmd())
 	root.AddCommand(initCmd())
 	root.AddCommand(commitCmd())
@@ -32,10 +32,10 @@ func main() {
 	}
 }
 
-func hatchCmd() *cobra.Command {
+func spawnCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "hatch",
-		Short: "Hatch a new pet",
+		Use:   "spawn",
+		Short: "Spawn a new pet",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			s, err := store.New()
 			if err != nil {
@@ -104,7 +104,7 @@ func showCmd() *cobra.Command {
 
 			pet, err := s.GetActivePet()
 			if err != nil {
-				fmt.Println("No pet found! Run 'pet hatch' to get started.")
+				fmt.Println("No pet found! Run 'pet spawn' to get started.")
 				return nil
 			}
 
