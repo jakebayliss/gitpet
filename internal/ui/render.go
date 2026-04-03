@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/petd/pet/internal/evolution"
 	"github.com/petd/pet/internal/store"
 	"github.com/petd/pet/internal/xp"
 )
@@ -37,8 +38,14 @@ func RenderPetCard(p *store.Pet) string {
 
 	b.WriteString(empty + "\n")
 
+	// Evolution stage
+	if p.Evolution > 1 {
+		stageLine := fmt.Sprintf("  Stage %d", p.Evolution)
+		b.WriteString(padLine(stageLine))
+	}
+
 	// ASCII art
-	art := GetArt(p.Species)
+	art := GetArtStage(p.Species, p.Evolution)
 	artLines := strings.Split(strings.TrimPrefix(art, "\n"), "\n")
 	for _, line := range artLines {
 		if p.Shiny && line == artLines[len(artLines)/2] {
@@ -71,11 +78,12 @@ func RenderPetCard(p *store.Pet) string {
 		return fmt.Sprintf("  %-8s %s  %d", name, bar, val)
 	}
 
-	b.WriteString(padLine(statBar("WIT", p.Stats.Wit)))
-	b.WriteString(padLine(statBar("DEPTH", p.Stats.Depth)))
-	b.WriteString(padLine(statBar("STAMINA", p.Stats.Stamina)))
-	b.WriteString(padLine(statBar("LUCK", p.Stats.Luck)))
-	b.WriteString(padLine(statBar("ATTUNE", p.Stats.Attune)))
+	evo := p.Evolution
+	b.WriteString(padLine(statBar("WIT", evolution.EffectiveStat(p.Stats.Wit, evo))))
+	b.WriteString(padLine(statBar("DEPTH", evolution.EffectiveStat(p.Stats.Depth, evo))))
+	b.WriteString(padLine(statBar("STAMINA", evolution.EffectiveStat(p.Stats.Stamina, evo))))
+	b.WriteString(padLine(statBar("LUCK", evolution.EffectiveStat(p.Stats.Luck, evo))))
+	b.WriteString(padLine(statBar("ATTUNE", evolution.EffectiveStat(p.Stats.Attune, evo))))
 
 	b.WriteString(border + "\n")
 

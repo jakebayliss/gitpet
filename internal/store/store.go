@@ -182,6 +182,12 @@ func (s *Store) UpdatePetXP(id string, xp, level int) error {
 	return err
 }
 
+func (s *Store) UpdatePetEvolution(id string, stage int) error {
+	_, err := s.db.Exec(`UPDATE pets SET evolution = ?, updated_at = ? WHERE id = ?`,
+		stage, time.Now(), id)
+	return err
+}
+
 func (s *Store) RecordCommit(c *Commit) error {
 	_, err := s.db.Exec(`
 		INSERT INTO commits (pet_id, repo, lines_changed, files_touched, xp_earned, drop_item, created_at)

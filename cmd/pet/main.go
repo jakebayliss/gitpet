@@ -9,9 +9,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/petd/pet/internal/drop"
+	"github.com/petd/pet/internal/evolution"
 	"github.com/petd/pet/internal/gen"
 	"github.com/petd/pet/internal/store"
-	"github.com/petd/pet/internal/drop"
 	"github.com/petd/pet/internal/ui"
 	"github.com/petd/pet/internal/xp"
 	"github.com/spf13/cobra"
@@ -28,6 +29,7 @@ func main() {
 	root.AddCommand(initCmd())
 	root.AddCommand(commitCmd())
 	root.AddCommand(inventoryCmd())
+	root.AddCommand(evolveCmd())
 
 	if err := root.Execute(); err != nil {
 		os.Exit(1)
@@ -277,6 +279,70 @@ func inventoryCmd() *cobra.Command {
 				fmt.Printf("  %-25s x%d\n", display, item.Quantity)
 			}
 			fmt.Println()
+			return nil
+		},
+	}
+}
+
+func evolveCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "evolve",
+		Short: "Evolve your active pet to the next stage",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			s, err := store.New()
+			if err != nil {
+				return err
+			}
+			defer s.Close()
+
+			pet, err := s.GetActivePet()
+			if err != nil {
+				fmt.Println("No pet found! Run 'pet spawn' to get started.")
+				return nil
+			}
+
+			if pet.Evolution >= 4 {
+				fmt.Printf("%s is already at max evolution (Stage 4)!\n", pet.Name)
+				return nil
+			}
+
+			hasStone, err := s.HasItem("evolution_stone")
+			if err != nil {
+				return err
+			}
+
+			canEvolve := evolution.CanEvolve(pet.Evolution, pet.Level, hasStone)
+			nextLevel := evolution.NextStageLevel(pet.Evolution)
+
+			if !canEvolve {
+				fmt.Printf("%s cannot evolve yet.\n", pet.Name)
+				if pet.Level < nextLevel {
+					fmt.Printf("  Level required: %d (current: %d)\n", nextLevel, pet.Level)
+				}
+				if !hasStone {
+					fmt.Println("  Missing: Evolution Stone (keep committing for drops!)")
+				}
+				return nil
+			}
+
+			// Consume the stone
+			if err := s.UseInventoryItem("evolution_stone"); err != nil {
+				return err
+			}
+
+			newStage := pet.Evolution + 1
+			if err := s.UpdatePetEvolution(pet.ID, newStage); err != nil {
+				return err
+			}
+
+			fmt.Printf("\n========================================\n")
+			fmt.Printf("  %s is evolving...\n", pet.Name)
+			fmt.Printf("  Stage %d -> Stage %d!\n", pet.Evolution, newStage)
+			fmt.Printf("========================================\n")
+			fmt.Println(ui.GetArtStage(pet.Species, newStage))
+			fmt.Printf("  Stats multiplier: %.1fx\n", evolution.Stages[newStage-1].StatMultiplier)
+			fmt.Printf("========================================\n\n")
+
 			return nil
 		},
 	}
