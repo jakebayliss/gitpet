@@ -160,6 +160,51 @@ func (s *Store) HasAnyPet() (bool, error) {
 	return count > 0, err
 }
 
+func (s *Store) GetAllPets() ([]*Pet, error) {
+	rows, err := s.db.Query(`SELECT id, name, species, rarity, shiny, level, xp, evolution, prestige,
+		wit, depth, stamina, luck, attune, active, hatched_at, updated_at
+		FROM pets ORDER BY active DESC, level DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var pets []*Pet
+	for rows.Next() {
+		p := &Pet{}
+		var shiny, active int
+		err := rows.Scan(
+			&p.ID, &p.Name, &p.Species, &p.Rarity, &shiny,
+			&p.Level, &p.XP, &p.Evolution, &p.Prestige,
+			&p.Stats.Wit, &p.Stats.Depth, &p.Stats.Stamina, &p.Stats.Luck, &p.Stats.Attune,
+			&active, &p.HatchedAt, &p.UpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		p.Shiny = shiny == 1
+		p.Active = active == 1
+		pets = append(pets, p)
+	}
+	return pets, nil
+}
+
+func (s *Store) DeletePet(id string) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec(`DELETE FROM commits WHERE pet_id = ?`, id); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM pets WHERE id = ?`, id); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 func (s *Store) SetActivePet(id string) error {
 	tx, err := s.db.Begin()
 	if err != nil {

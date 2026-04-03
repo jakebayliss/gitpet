@@ -31,6 +31,9 @@ func main() {
 	root.AddCommand(inventoryCmd())
 	root.AddCommand(evolveCmd())
 	root.AddCommand(prestigeCmd())
+	root.AddCommand(listCmd())
+	root.AddCommand(switchCmd())
+	root.AddCommand(killCmd())
 
 	if err := root.Execute(); err != nil {
 		os.Exit(1)
@@ -53,11 +56,54 @@ func spawnCmd() *cobra.Command {
 				return err
 			}
 
-			// First pet is always common
-			tier := gen.TierCommon
-			if hasPet {
-				fmt.Println("You already have a pet! Additional pets come from egg drops.")
-				return nil
+			var tier gen.Tier
+			if !hasPet {
+				// First pet is always common
+				tier = gen.TierCommon
+			} else {
+				// Check for eggs in inventory
+				hasRare, _ := s.HasItem("rare_egg")
+				hasLegendary, _ := s.HasItem("legendary_egg")
+
+				if hasLegendary {
+					fmt.Print("You have a LEGENDARY EGG! Use it? [y/N] > ")
+					reader := bufio.NewReader(os.Stdin)
+					input, _ := reader.ReadString('\n')
+					input = strings.TrimSpace(strings.ToLower(input))
+					if input == "y" || input == "yes" {
+						tier = gen.TierLegendary
+						s.UseInventoryItem("legendary_egg")
+					} else if hasRare {
+						fmt.Print("Use your Rare Egg instead? [y/N] > ")
+						input, _ = reader.ReadString('\n')
+						input = strings.TrimSpace(strings.ToLower(input))
+						if input == "y" || input == "yes" {
+							tier = gen.TierRare
+							s.UseInventoryItem("rare_egg")
+						} else {
+							fmt.Println("No egg used.")
+							return nil
+						}
+					} else {
+						fmt.Println("No egg used.")
+						return nil
+					}
+				} else if hasRare {
+					fmt.Print("You have a RARE EGG! Use it? [y/N] > ")
+					reader := bufio.NewReader(os.Stdin)
+					input, _ := reader.ReadString('\n')
+					input = strings.TrimSpace(strings.ToLower(input))
+					if input == "y" || input == "yes" {
+						tier = gen.TierRare
+						s.UseInventoryItem("rare_egg")
+					} else {
+						fmt.Println("No egg used.")
+						return nil
+					}
+				} else {
+					fmt.Println("You need an egg to spawn another pet! Keep committing for drops.")
+					return nil
+				}
 			}
 
 			pet := gen.Roll(tier)
@@ -82,12 +128,16 @@ func spawnCmd() *cobra.Command {
 
 			fmt.Printf("\nWelcome, %s!\n", pet.Name)
 
-			// Auto-install global git hook
-			if err := installGlobalHook(); err != nil {
-				fmt.Printf("Warning: couldn't install global git hook: %v\n", err)
-				fmt.Println("You can try manually with 'pet init --global'")
+			if !hasPet {
+				// Auto-install global git hook on first pet only
+				if err := installGlobalHook(); err != nil {
+					fmt.Printf("Warning: couldn't install global git hook: %v\n", err)
+					fmt.Println("You can try manually with 'pet init'")
+				} else {
+					fmt.Println("Global git hook installed — every commit in any repo feeds your pet!")
+				}
 			} else {
-				fmt.Println("Global git hook installed — every commit in any repo feeds your pet!")
+				fmt.Printf("%s is now your active pet.\n", pet.Name)
 			}
 
 			fmt.Println("\nRun 'pet show' to see your pet.")
@@ -397,6 +447,135 @@ func prestigeCmd() *cobra.Command {
 			fmt.Printf("  %s Prestige %d %s\n", stars, newPrestige, stars)
 			fmt.Printf("  +2 to all base stats permanently\n")
 			fmt.Printf("========================================\n\n")
+
+			return nil
+		},
+	}
+}
+
+func listCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "list",
+		Short: "Show all your pets",
+		Aliases: []string{"ls"},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			s, err := store.New()
+			if err != nil {
+				return err
+			}
+			defer s.Close()
+
+			pets, err := s.GetAllPets()
+			if err != nil {
+				return err
+			}
+
+			if len(pets) == 0 {
+				fmt.Println("No pets! Run 'pet spawn' to get started.")
+				return nil
+			}
+
+			fmt.Println()
+			for _, p := range pets {
+				active := "  "
+				if p.Active {
+					active = "> "
+				}
+				shiny := ""
+				if p.Shiny {
+					shiny = " *SHINY*"
+				}
+				stars := ""
+				if p.Prestige > 0 {
+					stars = " " + strings.Repeat("*", p.Prestige)
+				}
+				fmt.Printf("%s%-12s  Lv.%-3d  %-14s  %-9s  Stage %d%s%s\n",
+					active, p.Name, p.Level, p.Species, p.Rarity, p.Evolution, stars, shiny)
+			}
+			fmt.Println()
+			return nil
+		},
+	}
+}
+
+func switchCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "switch <name>",
+		Short: "Switch your active pet",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			s, err := store.New()
+			if err != nil {
+				return err
+			}
+			defer s.Close()
+
+			pet, err := s.GetPetByName(args[0])
+			if err != nil {
+				fmt.Printf("No pet named '%s' found. Run 'pet list' to see your pets.\n", args[0])
+				return nil
+			}
+
+			if pet.Active {
+				fmt.Printf("%s is already your active pet!\n", pet.Name)
+				return nil
+			}
+
+			if err := s.SetActivePet(pet.ID); err != nil {
+				return err
+			}
+
+			fmt.Printf("Switched to %s! (Lv.%d %s)\n", pet.Name, pet.Level, pet.Species)
+			return nil
+		},
+	}
+}
+
+func killCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "kill <name>",
+		Short: "Permanently delete a pet",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			s, err := store.New()
+			if err != nil {
+				return err
+			}
+			defer s.Close()
+
+			pet, err := s.GetPetByName(args[0])
+			if err != nil {
+				fmt.Printf("No pet named '%s' found.\n", args[0])
+				return nil
+			}
+
+			fmt.Printf("\nPermanently delete %s? (Lv.%d %s %s)\n", pet.Name, pet.Level, pet.Rarity, pet.Species)
+			fmt.Println("This cannot be undone.")
+			fmt.Print("\nType the pet's name to confirm: > ")
+
+			reader := bufio.NewReader(os.Stdin)
+			input, _ := reader.ReadString('\n')
+			input = strings.TrimSpace(input)
+
+			if input != pet.Name {
+				fmt.Println("Names don't match. Cancelled.")
+				return nil
+			}
+
+			if err := s.DeletePet(pet.ID); err != nil {
+				return err
+			}
+
+			fmt.Printf("\n%s is gone forever.\n\n", pet.Name)
+
+			// If we deleted the active pet, activate another one if available
+			if pet.Active {
+				pets, err := s.GetAllPets()
+				if err == nil && len(pets) > 0 {
+					s.SetActivePet(pets[0].ID)
+					fmt.Printf("%s is now your active pet.\n", pets[0].Name)
+				}
+			}
 
 			return nil
 		},
