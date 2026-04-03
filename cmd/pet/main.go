@@ -76,8 +76,16 @@ func hatchCmd() *cobra.Command {
 			}
 
 			fmt.Printf("\nWelcome, %s!\n", pet.Name)
+
+			// Auto-install global git hook
+			if err := installGlobalHook(); err != nil {
+				fmt.Printf("Warning: couldn't install global git hook: %v\n", err)
+				fmt.Println("You can try manually with 'pet init --global'")
+			} else {
+				fmt.Println("Global git hook installed — every commit in any repo feeds your pet!")
+			}
+
 			fmt.Println("\nRun 'pet show' to see your pet.")
-			fmt.Println("Run 'pet init' in a git repo to start earning XP!")
 			return nil
 		},
 	}
@@ -106,88 +114,49 @@ func showCmd() *cobra.Command {
 	}
 }
 
+func installGlobalHook() error {
+	exePath, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("finding executable path: %w", err)
+	}
+	exePath, err = filepath.Abs(exePath)
+	if err != nil {
+		return fmt.Errorf("resolving executable path: %w", err)
+	}
+	exePath = filepath.ToSlash(exePath)
+
+	hookScript := fmt.Sprintf("#!/bin/sh\n\"%s\" commit\n", exePath)
+
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	hooksDir := filepath.Join(home, ".petd", "hooks")
+	if err := os.MkdirAll(hooksDir, 0755); err != nil {
+		return err
+	}
+	hookPath := filepath.Join(hooksDir, "post-commit")
+	if err := os.WriteFile(hookPath, []byte(hookScript), 0755); err != nil {
+		return err
+	}
+	if err := exec.Command("git", "config", "--global", "core.hooksPath", hooksDir).Run(); err != nil {
+		return fmt.Errorf("setting global hooks path: %w", err)
+	}
+	return nil
+}
+
 func initCmd() *cobra.Command {
-	cmd := &cobra.Command{
+	return &cobra.Command{
 		Use:   "init",
-		Short: "Install git hook in current repo (or globally with --global)",
+		Short: "Reinstall global git hook (normally done automatically by pet hatch)",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			global, _ := cmd.Flags().GetBool("global")
-
-			// Use absolute path to this executable so the hook works
-			// regardless of PATH
-			exePath, err := os.Executable()
-			if err != nil {
-				return fmt.Errorf("finding executable path: %w", err)
-			}
-			exePath, err = filepath.Abs(exePath)
-			if err != nil {
-				return fmt.Errorf("resolving executable path: %w", err)
-			}
-			// Use forward slashes for shell compatibility
-			exePath = filepath.ToSlash(exePath)
-
-			hookScript := fmt.Sprintf("#!/bin/sh\n\"%s\" commit\n", exePath)
-
-			if global {
-				home, err := os.UserHomeDir()
-				if err != nil {
-					return err
-				}
-				hooksDir := filepath.Join(home, ".petd", "hooks")
-				if err := os.MkdirAll(hooksDir, 0755); err != nil {
-					return err
-				}
-				hookPath := filepath.Join(hooksDir, "post-commit")
-				if err := os.WriteFile(hookPath, []byte(hookScript), 0755); err != nil {
-					return err
-				}
-				// Set git global hooks path
-				if err := exec.Command("git", "config", "--global", "core.hooksPath", hooksDir).Run(); err != nil {
-					return fmt.Errorf("setting global hooks path: %w", err)
-				}
-				fmt.Printf("Global post-commit hook installed at %s\n", hookPath)
-				fmt.Println("All repos will now feed your pet on commit!")
-				return nil
-			}
-
-			// Local repo hook
-			gitDir, err := exec.Command("git", "rev-parse", "--git-dir").Output()
-			if err != nil {
-				return fmt.Errorf("not a git repository")
-			}
-			hooksDir := filepath.Join(strings.TrimSpace(string(gitDir)), "hooks")
-			if err := os.MkdirAll(hooksDir, 0755); err != nil {
+			if err := installGlobalHook(); err != nil {
 				return err
 			}
-			hookPath := filepath.Join(hooksDir, "post-commit")
-
-			// Check if hook already exists
-			if _, err := os.Stat(hookPath); err == nil {
-				existing, _ := os.ReadFile(hookPath)
-				if strings.Contains(string(existing), "pet commit") {
-					fmt.Println("Hook already installed!")
-					return nil
-				}
-				// Append to existing hook
-				f, err := os.OpenFile(hookPath, os.O_APPEND|os.O_WRONLY, 0755)
-				if err != nil {
-					return err
-				}
-				defer f.Close()
-				f.WriteString("\npet commit\n")
-				fmt.Println("Added pet to existing post-commit hook.")
-				return nil
-			}
-
-			if err := os.WriteFile(hookPath, []byte(hookScript), 0755); err != nil {
-				return err
-			}
-			fmt.Printf("Post-commit hook installed! Your pet will gain XP on every commit.\n")
+			fmt.Println("Global git hook installed — every commit in any repo feeds your pet!")
 			return nil
 		},
 	}
-	cmd.Flags().Bool("global", false, "Install hook globally for all repos")
-	return cmd
 }
 
 func commitCmd() *cobra.Command {
@@ -249,7 +218,3 @@ func commitCmd() *cobra.Command {
 		},
 	}
 }
-// test
-// branch test
-// auto hook test
-// final hook test
