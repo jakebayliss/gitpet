@@ -37,6 +37,7 @@ type Stats struct {
 type Commit struct {
 	ID           int
 	PetID        string
+	PetName      string
 	Repo         string
 	LinesChanged int
 	FilesTouched int
@@ -203,6 +204,35 @@ func (s *Store) DeletePet(id string) error {
 		return err
 	}
 	return tx.Commit()
+}
+
+func (s *Store) GetRecentCommits(limit int) ([]Commit, error) {
+	rows, err := s.db.Query(`
+		SELECT c.id, c.pet_id, c.repo, c.lines_changed, c.files_touched, c.xp_earned, c.drop_item, c.created_at,
+			p.name
+		FROM commits c
+		JOIN pets p ON c.pet_id = p.id
+		ORDER BY c.created_at DESC LIMIT ?`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var commits []Commit
+	for rows.Next() {
+		var c Commit
+		var dropItem sql.NullString
+		err := rows.Scan(&c.ID, &c.PetID, &c.Repo, &c.LinesChanged, &c.FilesTouched,
+			&c.XPEarned, &dropItem, &c.CreatedAt, &c.PetName)
+		if err != nil {
+			return nil, err
+		}
+		if dropItem.Valid {
+			c.DropItem = dropItem.String
+		}
+		commits = append(commits, c)
+	}
+	return commits, nil
 }
 
 func (s *Store) SetActivePet(id string) error {

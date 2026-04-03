@@ -34,6 +34,7 @@ func main() {
 	root.AddCommand(listCmd())
 	root.AddCommand(switchCmd())
 	root.AddCommand(killCmd())
+	root.AddCommand(logCmd())
 
 	if err := root.Execute(); err != nil {
 		os.Exit(1)
@@ -579,5 +580,65 @@ func killCmd() *cobra.Command {
 
 			return nil
 		},
+	}
+}
+
+func logCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "log",
+		Short: "Show recent commit history with XP and drops",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			s, err := store.New()
+			if err != nil {
+				return err
+			}
+			defer s.Close()
+
+			commits, err := s.GetRecentCommits(20)
+			if err != nil {
+				return err
+			}
+
+			if len(commits) == 0 {
+				fmt.Println("No commits yet. Start committing to earn XP!")
+				return nil
+			}
+
+			fmt.Println()
+			fmt.Printf("  %-12s  %-6s  %-5s  %-5s  %-20s  %s\n",
+				"PET", "XP", "LINES", "FILES", "DROP", "TIME")
+			fmt.Println("  " + strings.Repeat("-", 70))
+
+			for _, c := range commits {
+				dropDisplay := ""
+				if c.DropItem != "" && c.DropItem != "nothing" {
+					dropDisplay = drop.DisplayName(c.DropItem)
+					if dropDisplay == "" {
+						dropDisplay = c.DropItem
+					}
+				}
+
+				timeAgo := timeAgoStr(c.CreatedAt)
+
+				fmt.Printf("  %-12s  +%-5d  %-5d  %-5d  %-20s  %s\n",
+					c.PetName, c.XPEarned, c.LinesChanged, c.FilesTouched, dropDisplay, timeAgo)
+			}
+			fmt.Println()
+			return nil
+		},
+	}
+}
+
+func timeAgoStr(t time.Time) string {
+	d := time.Since(t)
+	switch {
+	case d < time.Minute:
+		return "just now"
+	case d < time.Hour:
+		return fmt.Sprintf("%dm ago", int(d.Minutes()))
+	case d < 24*time.Hour:
+		return fmt.Sprintf("%dh ago", int(d.Hours()))
+	default:
+		return fmt.Sprintf("%dd ago", int(d.Hours()/24))
 	}
 }
