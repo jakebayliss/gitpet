@@ -120,7 +120,24 @@ func RenderCommitResult(petName string, xpGained int, totalXP int, level int, le
 	}
 
 	if dropItem != "" && dropItem != "nothing" {
-		b.WriteString(fmt.Sprintf("DROP: %s!\n", dropItem))
+		switch dropItem {
+		case "legendary_egg":
+			b.WriteString("\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n")
+			b.WriteString("!!!  LEGENDARY EGG DROPPED!  !!!\n")
+			b.WriteString("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n")
+			b.WriteString("Use 'pet spawn' to hatch it!\n")
+		case "rare_egg":
+			b.WriteString("\n*** RARE EGG DROPPED! ***\n")
+			b.WriteString("Use 'pet spawn' to hatch it!\n")
+		case "evolution_stone":
+			b.WriteString("DROP: Evolution Stone!\n")
+		case "xp_crystal":
+			b.WriteString("DROP: XP Crystal! (+200 bonus XP)\n")
+		case "title_scroll":
+			b.WriteString("DROP: Title Scroll!\n")
+		default:
+			b.WriteString(fmt.Sprintf("DROP: %s!\n", dropItem))
+		}
 	}
 
 	return b.String()

@@ -11,6 +11,7 @@ import (
 
 	"github.com/petd/pet/internal/gen"
 	"github.com/petd/pet/internal/store"
+	"github.com/petd/pet/internal/drop"
 	"github.com/petd/pet/internal/ui"
 	"github.com/petd/pet/internal/xp"
 	"github.com/spf13/cobra"
@@ -26,6 +27,7 @@ func main() {
 	root.AddCommand(showCmd())
 	root.AddCommand(initCmd())
 	root.AddCommand(commitCmd())
+	root.AddCommand(inventoryCmd())
 
 	if err := root.Execute(); err != nil {
 		os.Exit(1)
@@ -184,8 +186,17 @@ func commitCmd() *cobra.Command {
 			streakDays, _ := s.GetStreakDays()
 			result := xp.Calculate(stats, streakDays)
 
+			// Roll for drop
+			dropItem := drop.Roll()
+
+			// Handle XP crystal immediately
+			bonusXP := 0
+			if dropItem == "xp_crystal" {
+				bonusXP = 200
+			}
+
 			oldLevel := pet.Level
-			pet.XP += result.TotalXP
+			pet.XP += result.TotalXP + bonusXP
 			newLevel := xp.LevelFromXP(pet.XP)
 			leveledUp := newLevel > oldLevel
 			pet.Level = newLevel
@@ -194,14 +205,28 @@ func commitCmd() *cobra.Command {
 				return err
 			}
 
+			// Store drop in inventory
+			if dropItem != "nothing" {
+				if dropItem == "title_scroll" {
+					// Store the actual title name
+					if err := s.AddInventoryItem("title:"+drop.RandomTitle(), 1); err != nil {
+						return err
+					}
+				} else if dropItem != "xp_crystal" {
+					if err := s.AddInventoryItem(dropItem, 1); err != nil {
+						return err
+					}
+				}
+			}
+
 			// Record commit
 			commit := &store.Commit{
 				PetID:        pet.ID,
 				Repo:         stats.Repo,
 				LinesChanged: stats.LinesChanged,
 				FilesTouched: stats.FilesTouched,
-				XPEarned:     result.TotalXP,
-				DropItem:     "nothing",
+				XPEarned:     result.TotalXP + bonusXP,
+				DropItem:     dropItem,
 				CreatedAt:    time.Now(),
 			}
 			if err := s.RecordCommit(commit); err != nil {
@@ -210,10 +235,48 @@ func commitCmd() *cobra.Command {
 
 			branchBonus := result.BranchBonus > 1.0
 			fmt.Print(ui.RenderCommitResult(
-				pet.Name, result.TotalXP, pet.XP, pet.Level,
-				leveledUp, oldLevel, streakDays, branchBonus, "nothing",
+				pet.Name, result.TotalXP+bonusXP, pet.XP, pet.Level,
+				leveledUp, oldLevel, streakDays, branchBonus, dropItem,
 			))
 
+			return nil
+		},
+	}
+}
+
+func inventoryCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "inventory",
+		Short: "Show your collected items",
+		Aliases: []string{"inv"},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			s, err := store.New()
+			if err != nil {
+				return err
+			}
+			defer s.Close()
+
+			items, err := s.GetInventory()
+			if err != nil {
+				return err
+			}
+
+			if len(items) == 0 {
+				fmt.Println("Your inventory is empty. Keep committing!")
+				return nil
+			}
+
+			fmt.Println("+========================+")
+			fmt.Println("|      INVENTORY         |")
+			fmt.Println("+========================+")
+			for _, item := range items {
+				display := drop.DisplayName(item.Item)
+				if display == "" {
+					display = item.Item
+				}
+				fmt.Printf("  %-25s x%d\n", display, item.Quantity)
+			}
+			fmt.Println()
 			return nil
 		},
 	}

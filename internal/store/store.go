@@ -240,6 +240,43 @@ func (s *Store) GetStreakDays() (int, error) {
 	return streak, nil
 }
 
+func (s *Store) AddInventoryItem(item string, qty int) error {
+	_, err := s.db.Exec(`
+		INSERT INTO inventory (item, quantity) VALUES (?, ?)
+		ON CONFLICT(item) DO UPDATE SET quantity = quantity + ?`,
+		item, qty, qty)
+	return err
+}
+
+func (s *Store) GetInventory() ([]InventoryItem, error) {
+	rows, err := s.db.Query(`SELECT item, quantity FROM inventory WHERE quantity > 0 ORDER BY item`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var items []InventoryItem
+	for rows.Next() {
+		var item InventoryItem
+		if err := rows.Scan(&item.Item, &item.Quantity); err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, nil
+}
+
+func (s *Store) UseInventoryItem(item string) error {
+	_, err := s.db.Exec(`UPDATE inventory SET quantity = quantity - 1 WHERE item = ? AND quantity > 0`, item)
+	return err
+}
+
+func (s *Store) HasItem(item string) (bool, error) {
+	var qty int
+	err := s.db.QueryRow(`SELECT COALESCE((SELECT quantity FROM inventory WHERE item = ?), 0)`, item).Scan(&qty)
+	return qty > 0, err
+}
+
 func (s *Store) GetTodayCommitCount() (int, error) {
 	today := time.Now().Format("2006-01-02")
 	var count int
