@@ -11,7 +11,7 @@ import (
 
 const cardWidth = 40
 
-func RenderPetCard(p *store.Pet) string {
+func RenderPetCard(p *store.Pet, hasStone bool) string {
 	var b strings.Builder
 
 	border := "+" + strings.Repeat("=", cardWidth-2) + "+"
@@ -84,6 +84,25 @@ func RenderPetCard(p *store.Pet) string {
 	b.WriteString(padLine(statBar("STAMINA", evolution.EffectiveStat(p.Stats.Stamina, evo))))
 	b.WriteString(padLine(statBar("LUCK", evolution.EffectiveStat(p.Stats.Luck, evo))))
 	b.WriteString(padLine(statBar("ATTUNE", evolution.EffectiveStat(p.Stats.Attune, evo))))
+
+	b.WriteString(empty + "\n")
+
+	// Evolution info
+	if p.Evolution < 4 {
+		nextLevel := evolution.NextStageLevel(p.Evolution)
+		stoneStatus := "no"
+		if hasStone {
+			stoneStatus = "YES"
+		}
+		evolveReady := ""
+		if p.Level >= nextLevel && hasStone {
+			evolveReady = "  READY! run 'pet evolve'"
+		}
+		evoLine := fmt.Sprintf("  Next evo: Lv.%d  Stone: %s%s", nextLevel, stoneStatus, evolveReady)
+		b.WriteString(padLine(evoLine))
+	} else {
+		b.WriteString(padLine("  MAX EVOLUTION"))
+	}
 
 	b.WriteString(border + "\n")
 

@@ -112,7 +112,8 @@ func showCmd() *cobra.Command {
 				return nil
 			}
 
-			fmt.Print(ui.RenderPetCard(pet))
+			hasStone, _ := s.HasItem("evolution_stone")
+			fmt.Print(ui.RenderPetCard(pet, hasStone))
 			return nil
 		},
 	}
@@ -311,21 +312,19 @@ func evolveCmd() *cobra.Command {
 				return err
 			}
 
-			canEvolve := evolution.CanEvolve(pet.Evolution, pet.Level, hasStone)
 			nextLevel := evolution.NextStageLevel(pet.Evolution)
 
-			if !canEvolve {
-				fmt.Printf("%s cannot evolve yet.\n", pet.Name)
-				if pet.Level < nextLevel {
-					fmt.Printf("  Level required: %d (current: %d)\n", nextLevel, pet.Level)
-				}
-				if !hasStone {
-					fmt.Println("  Missing: Evolution Stone (keep committing for drops!)")
-				}
+			if pet.Level < nextLevel {
+				fmt.Printf("%s needs to be Level %d to evolve (current: %d)\n", pet.Name, nextLevel, pet.Level)
 				return nil
 			}
 
-			// Consume the stone
+			if !hasStone {
+				fmt.Printf("%s is ready to evolve but you need an Evolution Stone!\n", pet.Name)
+				fmt.Println("Keep committing for a chance to drop one.")
+				return nil
+			}
+
 			if err := s.UseInventoryItem("evolution_stone"); err != nil {
 				return err
 			}
