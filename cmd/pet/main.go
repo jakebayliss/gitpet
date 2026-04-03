@@ -113,7 +113,20 @@ func initCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			global, _ := cmd.Flags().GetBool("global")
 
-			hookScript := "#!/bin/sh\npet commit\n"
+			// Use absolute path to this executable so the hook works
+			// regardless of PATH
+			exePath, err := os.Executable()
+			if err != nil {
+				return fmt.Errorf("finding executable path: %w", err)
+			}
+			exePath, err = filepath.Abs(exePath)
+			if err != nil {
+				return fmt.Errorf("resolving executable path: %w", err)
+			}
+			// Use forward slashes for shell compatibility
+			exePath = filepath.ToSlash(exePath)
+
+			hookScript := fmt.Sprintf("#!/bin/sh\n\"%s\" commit\n", exePath)
 
 			if global {
 				home, err := os.UserHomeDir()
@@ -239,3 +252,4 @@ func commitCmd() *cobra.Command {
 // test
 // branch test
 // auto hook test
+// final hook test
