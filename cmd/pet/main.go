@@ -30,6 +30,7 @@ func main() {
 	root.AddCommand(commitCmd())
 	root.AddCommand(inventoryCmd())
 	root.AddCommand(evolveCmd())
+	root.AddCommand(prestigeCmd())
 
 	if err := root.Execute(); err != nil {
 		os.Exit(1)
@@ -340,6 +341,61 @@ func evolveCmd() *cobra.Command {
 			fmt.Printf("========================================\n")
 			fmt.Println(ui.GetArtStage(pet.Species, newStage))
 			fmt.Printf("  Stats multiplier: %.1fx\n", evolution.Stages[newStage-1].StatMultiplier)
+			fmt.Printf("========================================\n\n")
+
+			return nil
+		},
+	}
+}
+
+func prestigeCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "prestige",
+		Short: "Reset to level 1 for a prestige star and permanent stat bonus (requires level 99)",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			s, err := store.New()
+			if err != nil {
+				return err
+			}
+			defer s.Close()
+
+			pet, err := s.GetActivePet()
+			if err != nil {
+				fmt.Println("No pet found! Run 'pet spawn' to get started.")
+				return nil
+			}
+
+			if pet.Level < 99 {
+				fmt.Printf("%s needs to be Level 99 to prestige (current: %d)\n", pet.Name, pet.Level)
+				return nil
+			}
+
+			newPrestige := pet.Prestige + 1
+			stars := strings.Repeat("*", newPrestige)
+
+			fmt.Printf("\nAre you sure? %s will reset to Level 1.\n", pet.Name)
+			fmt.Printf("  Prestige stars earned: %s\n", stars)
+			fmt.Printf("  Permanent stat bonus: +2 to all stats\n")
+			fmt.Printf("  Evolution resets to Stage 1\n")
+			fmt.Print("\n[y/N] > ")
+
+			reader := bufio.NewReader(os.Stdin)
+			input, _ := reader.ReadString('\n')
+			input = strings.TrimSpace(strings.ToLower(input))
+
+			if input != "y" && input != "yes" {
+				fmt.Println("Prestige cancelled.")
+				return nil
+			}
+
+			if err := s.PrestigePet(pet.ID, newPrestige, 2); err != nil {
+				return err
+			}
+
+			fmt.Printf("\n========================================\n")
+			fmt.Printf("  %s has been reborn!\n", pet.Name)
+			fmt.Printf("  %s Prestige %d %s\n", stars, newPrestige, stars)
+			fmt.Printf("  +2 to all base stats permanently\n")
 			fmt.Printf("========================================\n\n")
 
 			return nil

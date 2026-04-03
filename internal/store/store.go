@@ -188,6 +188,16 @@ func (s *Store) UpdatePetEvolution(id string, stage int) error {
 	return err
 }
 
+func (s *Store) PrestigePet(id string, newPrestige int, statBonus int) error {
+	_, err := s.db.Exec(`UPDATE pets SET
+		level = 1, xp = 0, evolution = 1, prestige = ?,
+		wit = wit + ?, depth = depth + ?, stamina = stamina + ?,
+		luck = luck + ?, attune = attune + ?, updated_at = ?
+		WHERE id = ?`,
+		newPrestige, statBonus, statBonus, statBonus, statBonus, statBonus, time.Now(), id)
+	return err
+}
+
 func (s *Store) RecordCommit(c *Commit) error {
 	_, err := s.db.Exec(`
 		INSERT INTO commits (pet_id, repo, lines_changed, files_touched, xp_earned, drop_item, created_at)
