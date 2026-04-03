@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/petd/pet/internal/drop"
 	"github.com/petd/pet/internal/evolution"
 	"github.com/petd/pet/internal/gen"
@@ -35,6 +36,7 @@ func main() {
 	root.AddCommand(switchCmd())
 	root.AddCommand(killCmd())
 	root.AddCommand(logCmd())
+	root.AddCommand(watchCmd())
 
 	if err := root.Execute(); err != nil {
 		os.Exit(1)
@@ -640,5 +642,26 @@ func timeAgoStr(t time.Time) string {
 		return fmt.Sprintf("%dh ago", int(d.Hours()))
 	default:
 		return fmt.Sprintf("%dd ago", int(d.Hours()/24))
+	}
+}
+
+func watchCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "watch",
+		Short: "Live pet window — keep it floating while you code",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			s, err := store.New()
+			if err != nil {
+				return err
+			}
+
+			m := ui.NewWatchModel(s)
+			p := tea.NewProgram(m, tea.WithAltScreen())
+			if _, err := p.Run(); err != nil {
+				return err
+			}
+			s.Close()
+			return nil
+		},
 	}
 }
