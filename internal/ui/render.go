@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/petd/pet/internal/evolution"
-	"github.com/petd/pet/internal/store"
-	"github.com/petd/pet/internal/xp"
+	"github.com/jakebayliss/gitpet/internal/evolution"
+	"github.com/jakebayliss/gitpet/internal/store"
+	"github.com/jakebayliss/gitpet/internal/xp"
 )
 
 const cardWidth = 40

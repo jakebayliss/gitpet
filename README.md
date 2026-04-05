@@ -38,7 +38,7 @@ DROP: Evolution Stone!
 ## Install
 
 ```bash
-go install github.com/jakebayliss/gitpet/cmd/pet@latest
+go install github.com/jakebayliss/gitpet/cmd/pet@main
 ```
 
 ## Quick start

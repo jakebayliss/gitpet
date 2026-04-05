@@ -10,12 +10,12 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/petd/pet/internal/drop"
-	"github.com/petd/pet/internal/evolution"
-	"github.com/petd/pet/internal/gen"
-	"github.com/petd/pet/internal/store"
-	"github.com/petd/pet/internal/ui"
-	"github.com/petd/pet/internal/xp"
+	"github.com/jakebayliss/gitpet/internal/drop"
+	"github.com/jakebayliss/gitpet/internal/evolution"
+	"github.com/jakebayliss/gitpet/internal/gen"
+	"github.com/jakebayliss/gitpet/internal/store"
+	"github.com/jakebayliss/gitpet/internal/ui"
+	"github.com/jakebayliss/gitpet/internal/xp"
 	"github.com/spf13/cobra"
 )
 

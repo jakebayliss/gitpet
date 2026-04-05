@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/petd/pet/internal/store"
+	"github.com/jakebayliss/gitpet/internal/store"
 )
 
 type Tier string

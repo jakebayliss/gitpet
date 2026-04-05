@@ -1,4 +1,4 @@
-module github.com/petd/pet
+module github.com/jakebayliss/gitpet
 
 go 1.26.1
 
